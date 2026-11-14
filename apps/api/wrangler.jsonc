@@ -1,0 +1,30 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "weekbox-events-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-14",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "weekbox-events",
+      "database_id": "8186a7d5-89bf-4763-b1f5-05a460997ce1",
+      "migrations_dir": "migrations",
+    },
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "EVENT_HUB", "class_name": "EventHub" }],
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["EventHub"] }],
+  "assets": {
+    "directory": "../admin/dist",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*", "/admin*"],
+  },
+  "vars": {
+    "ALLOWED_ORIGINS": "",
+    "ENVIRONMENT": "production",
+    "DEV_AUTH": "false",
+    "CF_ACCESS_TEAM_DOMAIN": "ancient-sun-1d27.cloudflareaccess.com",
+    "CF_ACCESS_AUD": "6ddd0a41efdad7dfa7e152a533f905329691535d8d83e7769adcad1521569856",
+  },
+}

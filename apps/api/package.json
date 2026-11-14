@@ -1,0 +1,20 @@
+{
+  "name": "@weekbox/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --local --ip 127.0.0.1 --port 8787 --var ENVIRONMENT:development --var DEV_AUTH:true",
+    "build": "wrangler deploy --dry-run --outdir=dist",
+    "typecheck": "wrangler types && tsc --noEmit -p tsconfig.json",
+    "db:migrate:local": "wrangler d1 migrations apply weekbox-events --local",
+    "db:seed:local": "wrangler d1 execute weekbox-events --local --file=./seeds/local.sql"
+  },
+  "dependencies": {
+    "@weekbox/shared": "workspace:*",
+    "jose": "6.1.0"
+  },
+  "devDependencies": {
+    "wrangler": "4.162.0"
+  }
+}

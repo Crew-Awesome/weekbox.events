@@ -1,0 +1,32 @@
+{
+  "name": "weekbox-events",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.18.0",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter @weekbox/api --filter @weekbox/admin dev",
+    "build": "pnpm --filter @weekbox/shared build && pnpm --filter @weekbox/admin build && pnpm --filter @weekbox/api build",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:migrate:local": "pnpm --filter @weekbox/api db:migrate:local",
+    "db:seed:local": "pnpm --filter @weekbox/api db:seed:local"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "26.6.6",
+    "eslint": "10.15.0",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "eslint-plugin-react-refresh": "0.5.7",
+    "globals": "17.14.0",
+    "pnpm": "12.18.0",
+    "prettier": "3.10.1",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.2"
+  }
+}

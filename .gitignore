@@ -15,6 +15,7 @@ coverage/
 .wrangler/
 .vite/
 .turbo/
+worker-configuration.d.ts
 
 *.log
 .DS_Store

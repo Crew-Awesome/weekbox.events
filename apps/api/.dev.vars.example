@@ -1,0 +1,2 @@
+# Optional comma-separated browser origins allowed by the API's CORS policy.
+ALLOWED_ORIGINS=http://localhost:5173

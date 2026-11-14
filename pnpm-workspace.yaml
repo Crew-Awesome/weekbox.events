@@ -1,0 +1,12 @@
+packages:
+  - apps/*
+  - packages/*
+allowBuilds:
+  esbuild: true
+  pnpm: true
+  workerd: true
+minimumReleaseAgeExclude:
+  - "@eslint/config-array@0.23.6"
+  - eslint@10.15.0
+  - miniflare@5.20261113.0-beta
+  - wrangler@4.162.0
