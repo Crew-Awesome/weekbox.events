@@ -15,7 +15,7 @@ pnpm db:seed:local
 pnpm dev
 ```
 
-Admin panel: http://127.0.0.1:5173
+Admin panel: http://127.0.0.1:5173 (on local, i wont reveal public lol)
 
 ## Features
 
