@@ -25,7 +25,7 @@ Admin panel: http://127.0.0.1:5173 (on local, i wont reveal public lol)
 
 ## API
 
-Undocumented yet :p
+`GET /api/v1/events` lists visible events. `GET /api/v1/events/:id` returns an event. `startsAt` and `endsAt` are UTC date strings or `null` until dates are announced.
 
 ## Deployment
 
@@ -41,6 +41,6 @@ pnpm --filter @weekbox/api exec wrangler deploy
 ```bash
 pnpm typecheck
 pnpm lint
-pnpm format:checkx
+pnpm format:check
 pnpm build
 ```

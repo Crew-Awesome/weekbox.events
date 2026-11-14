@@ -5,6 +5,8 @@ INSERT OR IGNORE INTO events (
   description,
   starts_at,
   ends_at,
+  scheduled_starts_at,
+  scheduled_ends_at,
   status,
   is_visible
 ) VALUES (
@@ -14,11 +16,14 @@ INSERT OR IGNORE INTO events (
   'Sample event for the local preview.',
   '2027-03-12T18:00:00Z',
   '2027-03-12T23:00:00Z',
+  '2027-03-12T18:00:00Z',
+  '2027-03-12T23:00:00Z',
   'draft',
   1
 )
 ON CONFLICT(id) DO UPDATE SET slug=excluded.slug,name=excluded.name,description=excluded.description,
-  starts_at=excluded.starts_at,ends_at=excluded.ends_at,status=excluded.status,is_visible=excluded.is_visible,
+  starts_at=excluded.starts_at,ends_at=excluded.ends_at,scheduled_starts_at=excluded.scheduled_starts_at,
+  scheduled_ends_at=excluded.scheduled_ends_at,status=excluded.status,is_visible=excluded.is_visible,
   updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now');
 
 UPDATE events SET status='upcoming', is_visible=1 WHERE id='dev-event-001';

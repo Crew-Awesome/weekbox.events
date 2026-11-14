@@ -41,8 +41,8 @@ type EventRow = {
   name: string;
   description: string;
   bannerUrl: string | null;
-  startsAt: string;
-  endsAt: string;
+  startsAt: string | null;
+  endsAt: string | null;
   status: EventStatus;
   isVisible: boolean | number;
   version: number;
@@ -50,7 +50,6 @@ type EventRow = {
 type ModRow = {
   id: string;
   eventId: string;
-  identifier: string;
   title: string;
   description: string;
   artworkUrl: string | null;
@@ -109,7 +108,8 @@ function query(path: string, values: Record<string, string | number>) {
   );
   return `${path}?${params}`;
 }
-function isoLocal(value: string) {
+function isoLocal(value: string | null) {
+  if (!value) return "";
   const date = new Date(value);
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000)
     .toISOString()
@@ -118,7 +118,8 @@ function isoLocal(value: string) {
 function asIso(value: string) {
   return new Date(value).toISOString();
 }
-function prettyDate(value: string) {
+function prettyDate(value: string | null) {
+  if (!value) return "Date to be announced";
   return new Date(value).toLocaleString([], {
     dateStyle: "medium",
     timeStyle: "short",
@@ -697,8 +698,8 @@ function EventForm({
       name: String(data.name),
       description: String(data.description),
       bannerUrl: String(data.bannerUrl) || null,
-      startsAt: asIso(String(data.startsAt)),
-      endsAt: asIso(String(data.endsAt)),
+      startsAt: String(data.startsAt) ? asIso(String(data.startsAt)) : null,
+      endsAt: String(data.endsAt) ? asIso(String(data.endsAt)) : null,
       status: String(data.status),
       isVisible: data.isVisible === "on",
     };
@@ -747,14 +748,13 @@ function EventForm({
           name="startsAt"
           type="datetime-local"
           defaultValue={event ? isoLocal(event.startsAt) : undefined}
-          required
+          description="Leave both dates empty until they are announced."
         />
         <TextInput
           label="Ends"
           name="endsAt"
           type="datetime-local"
           defaultValue={event ? isoLocal(event.endsAt) : undefined}
-          required
         />
       </Group>
       <Select
@@ -1069,9 +1069,6 @@ function ModsScreen({
                   </Table.Td>
                   <Table.Td>
                     <Text fw={600}>{mod.title}</Text>
-                    <Text size="xs" c="dimmed">
-                      {mod.identifier}
-                    </Text>
                   </Table.Td>
                   <Table.Td>
                     <div className="mod-preview">
@@ -1202,7 +1199,6 @@ function ModForm({
     e.preventDefault();
     const d = Object.fromEntries(new FormData(e.currentTarget));
     const parsed = modInputSchema.safeParse({
-      identifier: d.identifier,
       title: d.title,
       description: d.description,
       artworkUrl: String(d.artworkUrl) || null,
@@ -1223,12 +1219,6 @@ function ModForm({
         defaultValue={mod?.title}
         required
       />
-      <TextInput
-        label="Launcher identifier"
-        name="identifier"
-        defaultValue={mod?.identifier}
-        required
-      />
       <Textarea
         label="Description"
         name="description"
@@ -1242,10 +1232,11 @@ function ModForm({
         defaultValue={mod?.artworkUrl ?? ""}
       />
       <TextInput
-        label="itch.io or external URL"
+        label="Mod URL (if released during event)"
         name="externalUrl"
         type="url"
         defaultValue={mod?.externalUrl ?? ""}
+        description="Link to itch.io, GameJolt, GameBanana, or Funkin' Backstage."
       />
       {message && <Alert color="red">{message}</Alert>}
       <Button type="submit" loading={pending}>

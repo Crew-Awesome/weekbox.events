@@ -188,7 +188,7 @@ async function mutateEvent(
 
 async function publicEventById(env: Env, eventId: string) {
   return env.DB.prepare(
-    "SELECT id, slug, name, description, banner_url AS bannerUrl, starts_at AS startsAt, ends_at AS endsAt, status FROM events WHERE id = ? AND is_visible = 1 AND status IN ('upcoming','live','ended')",
+    "SELECT id, slug, name, description, banner_url AS bannerUrl, scheduled_starts_at AS startsAt, scheduled_ends_at AS endsAt, status FROM events WHERE id = ? AND is_visible = 1 AND status IN ('upcoming','live','ended')",
   )
     .bind(eventId)
     .first<Record<string, unknown>>();
@@ -202,9 +202,9 @@ async function handlePublic(
   if (request.method === "GET" && url.pathname === "/api/v1/events") {
     const rows = await env.DB.prepare(
       `SELECT e.id, e.slug, e.name, e.description, e.banner_url AS bannerUrl,
-      e.starts_at AS startsAt, e.ends_at AS endsAt, e.status, COALESCE(v.version, 1) AS version
+      e.scheduled_starts_at AS startsAt, e.scheduled_ends_at AS endsAt, e.status, COALESCE(v.version, 1) AS version
       FROM events e LEFT JOIN event_state_versions v ON v.event_id=e.id
-      WHERE e.is_visible=1 AND e.status IN ('upcoming','live','ended') ORDER BY e.starts_at LIMIT 100`,
+      WHERE e.is_visible=1 AND e.status IN ('upcoming','live','ended') ORDER BY COALESCE(e.scheduled_starts_at,'9999-12-31T23:59:59Z') LIMIT 100`,
     ).all();
     return json({ data: rows.results }, 200, {
       "Cache-Control":
@@ -306,7 +306,7 @@ async function handleAdmin(
     bindings.push(`%${search}%`, `%${search}%`);
     if (user.role !== "owner") bindings.push(user.id);
     const rows = await env.DB.prepare(
-      `SELECT e.id,e.slug,e.name,e.description,e.banner_url AS bannerUrl,e.starts_at AS startsAt,e.ends_at AS endsAt,e.status,e.is_visible AS isVisible,COALESCE(v.version,1) AS version FROM events e LEFT JOIN event_state_versions v ON v.event_id=e.id ${where} ORDER BY e.updated_at DESC LIMIT ? OFFSET ?`,
+      `SELECT e.id,e.slug,e.name,e.description,e.banner_url AS bannerUrl,e.scheduled_starts_at AS startsAt,e.scheduled_ends_at AS endsAt,e.status,e.is_visible AS isVisible,COALESCE(v.version,1) AS version FROM events e LEFT JOIN event_state_versions v ON v.event_id=e.id ${where} ORDER BY e.updated_at DESC LIMIT ? OFFSET ?`,
     )
       .bind(...bindings, pageSize, offset)
       .all();
@@ -329,17 +329,19 @@ async function handleAdmin(
     try {
       await env.DB.batch([
         env.DB.prepare(
-          "INSERT INTO events (id,slug,name,description,banner_url,starts_at,ends_at,status,is_visible) VALUES (?,?,?,?,?,?,?,?,?)",
+          "INSERT INTO events (id,slug,name,description,banner_url,starts_at,ends_at,status,is_visible,scheduled_starts_at,scheduled_ends_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
         ).bind(
           eventId,
           input.data.slug,
           input.data.name,
           input.data.description,
           input.data.bannerUrl ?? null,
-          input.data.startsAt,
-          input.data.endsAt,
+          input.data.startsAt ?? "0001-01-01T00:00:00.000Z",
+          input.data.endsAt ?? "0001-01-02T00:00:00.000Z",
           input.data.status,
           input.data.isVisible ? 1 : 0,
+          input.data.startsAt,
+          input.data.endsAt,
         ),
         env.DB.prepare(
           "INSERT INTO event_state_versions (event_id,version) VALUES (?,1)",
@@ -372,7 +374,7 @@ async function handleAdmin(
       const denied = await eventAccess(user, env, eventId.data);
       if (denied) return denied;
       const event = await env.DB.prepare(
-        `SELECT e.id,e.slug,e.name,e.description,e.banner_url AS bannerUrl,e.starts_at AS startsAt,e.ends_at AS endsAt,e.status,e.is_visible AS isVisible,COALESCE(v.version,1) AS version FROM events e LEFT JOIN event_state_versions v ON v.event_id=e.id WHERE e.id=?`,
+        `SELECT e.id,e.slug,e.name,e.description,e.banner_url AS bannerUrl,e.scheduled_starts_at AS startsAt,e.scheduled_ends_at AS endsAt,e.status,e.is_visible AS isVisible,COALESCE(v.version,1) AS version FROM events e LEFT JOIN event_state_versions v ON v.event_id=e.id WHERE e.id=?`,
       )
         .bind(eventId.data)
         .first();
@@ -394,7 +396,7 @@ async function handleAdmin(
           "Send the current event version in If-Match",
         );
       const old = await env.DB.prepare(
-        `SELECT e.slug,e.name,e.description,e.banner_url,e.starts_at,e.ends_at,e.status,e.is_visible,
+        `SELECT e.slug,e.name,e.description,e.banner_url,e.scheduled_starts_at,e.scheduled_ends_at,e.status,e.is_visible,
         COALESCE(v.version,1) AS version FROM events e LEFT JOIN event_state_versions v ON v.event_id=e.id WHERE e.id=?`,
       )
         .bind(eventId.data)
@@ -403,8 +405,8 @@ async function handleAdmin(
           name: string;
           description: string;
           banner_url: string | null;
-          starts_at: string;
-          ends_at: string;
+          scheduled_starts_at: string | null;
+          scheduled_ends_at: string | null;
           status: string;
           is_visible: number;
           version: number;
@@ -432,25 +434,27 @@ async function handleAdmin(
         old.name === parsed.data.name &&
         old.description === parsed.data.description &&
         old.banner_url === (parsed.data.bannerUrl ?? null) &&
-        old.starts_at === parsed.data.startsAt &&
-        old.ends_at === parsed.data.endsAt &&
+        old.scheduled_starts_at === parsed.data.startsAt &&
+        old.scheduled_ends_at === parsed.data.endsAt &&
         old.status === parsed.data.status &&
         Boolean(old.is_visible) === parsed.data.isVisible;
       if (unchanged) return json({ data: { version: old.version } });
       const statement = (mutationId: string) =>
         env.DB.prepare(
-          `UPDATE events SET slug=?,name=?,description=?,banner_url=?,starts_at=?,ends_at=?,status=?,is_visible=?,updated_at=?
+          `UPDATE events SET slug=?,name=?,description=?,banner_url=?,starts_at=?,ends_at=?,status=?,is_visible=?,updated_at=?,scheduled_starts_at=?,scheduled_ends_at=?
         WHERE id=? AND EXISTS (SELECT 1 FROM event_state_versions WHERE event_id=? AND last_mutation_id=?)`,
         ).bind(
           parsed.data.slug,
           parsed.data.name,
           parsed.data.description,
           parsed.data.bannerUrl ?? null,
-          parsed.data.startsAt,
-          parsed.data.endsAt,
+          parsed.data.startsAt ?? "0001-01-01T00:00:00.000Z",
+          parsed.data.endsAt ?? "0001-01-02T00:00:00.000Z",
           parsed.data.status,
           parsed.data.isVisible ? 1 : 0,
           now(),
+          parsed.data.startsAt,
+          parsed.data.endsAt,
           eventId.data,
           eventId.data,
           mutationId,
@@ -527,7 +531,7 @@ async function handleAdmin(
     if (denied) return denied;
     if (request.method === "GET" && !modsPath[2]) {
       const rows = await env.DB.prepare(
-        "SELECT id,event_id AS eventId,identifier,title,description,artwork_url AS artworkUrl,external_url AS externalUrl,position,visibility,revealed_at AS revealedAt FROM event_mods WHERE event_id=? ORDER BY position",
+        "SELECT id,event_id AS eventId,title,description,artwork_url AS artworkUrl,external_url AS externalUrl,position,visibility,revealed_at AS revealedAt FROM event_mods WHERE event_id=? ORDER BY position",
       )
         .bind(eventId.data)
         .all();
@@ -544,17 +548,6 @@ async function handleAdmin(
           "Send the current event version in If-Match",
         );
       const modId = id("mod");
-      const duplicate = await env.DB.prepare(
-        "SELECT 1 FROM event_mods WHERE event_id=? AND identifier=?",
-      )
-        .bind(eventId.data, parsed.data.identifier)
-        .first();
-      if (duplicate)
-        return fail(
-          409,
-          "mod_identifier_conflict",
-          "This event already has a mod with that identifier",
-        );
       const position =
         parsed.data.position ??
         (
@@ -572,7 +565,7 @@ async function handleAdmin(
         ).bind(
           modId,
           eventId.data,
-          parsed.data.identifier,
+          modId,
           parsed.data.title,
           parsed.data.description,
           parsed.data.artworkUrl ?? null,
@@ -599,6 +592,7 @@ async function handleAdmin(
           data: {
             id: modId,
             eventId: eventId.data,
+            identifier: modId,
             ...parsed.data,
             position,
             visibility: "hidden",
@@ -624,23 +618,11 @@ async function handleAdmin(
         .bind(eventId.data, modId)
         .first<{ position: number }>();
       if (!existing) return fail(404, "not_found", "Mod not found");
-      const duplicate = await env.DB.prepare(
-        "SELECT 1 FROM event_mods WHERE event_id=? AND identifier=? AND id<>?",
-      )
-        .bind(eventId.data, input.data.identifier, modId)
-        .first();
-      if (duplicate)
-        return fail(
-          409,
-          "mod_identifier_conflict",
-          "This event already has a mod with that identifier",
-        );
       const statement = (mutationId: string) =>
         env.DB.prepare(
-          `UPDATE event_mods SET identifier=?,title=?,description=?,artwork_url=?,external_url=?,position=?,updated_at=?
+          `UPDATE event_mods SET title=?,description=?,artwork_url=?,external_url=?,position=?,updated_at=?
         WHERE id=? AND event_id=? AND EXISTS (SELECT 1 FROM event_state_versions WHERE event_id=? AND last_mutation_id=?)`,
         ).bind(
-          input.data.identifier,
           input.data.title,
           input.data.description,
           input.data.artworkUrl ?? null,

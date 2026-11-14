@@ -21,23 +21,25 @@ export const eventInputSchema = z
     name: z.string().trim().min(1).max(120),
     description: z.string().max(8000).default(""),
     bannerUrl: z.string().url().max(2048).nullable().optional(),
-    startsAt: z.string().datetime(),
-    endsAt: z.string().datetime(),
+    startsAt: z.string().datetime().nullable().default(null),
+    endsAt: z.string().datetime().nullable().default(null),
     status: eventStatusSchema.default("draft"),
     isVisible: z.boolean().default(false),
   })
-  .refine((event) => Date.parse(event.startsAt) < Date.parse(event.endsAt), {
-    path: ["endsAt"],
-    message: "End date must be after start date",
-  });
+  .refine(
+    (event) =>
+      (event.startsAt === null && event.endsAt === null) ||
+      (event.startsAt !== null &&
+        event.endsAt !== null &&
+        Date.parse(event.startsAt) < Date.parse(event.endsAt)),
+    {
+      path: ["endsAt"],
+      message:
+        "Set both dates, with the end after the start, or leave both unset",
+    },
+  );
 
 export const modInputSchema = z.object({
-  identifier: z
-    .string()
-    .trim()
-    .min(1)
-    .max(80)
-    .regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/),
   title: z.string().trim().min(1).max(120),
   description: z.string().max(4000).default(""),
   artworkUrl: z.string().url().max(2048).nullable().optional(),
